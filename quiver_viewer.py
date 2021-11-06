@@ -1,14 +1,10 @@
 import numpy as np
 import matplotlib.patches as patches
 import matplotlib.pyplot as plt
-from math import sqrt, floor
-try:
-    import matplotlib.pyplot as plt
-except:
-    raise 
 
 import networkx as nx
-import math
+from math import sqrt, floor
+
 try:
     from networkx import graphviz_layout
     layout=nx.graphviz_layout
@@ -27,15 +23,11 @@ G.add_edge('3','4')
 G.add_edge('4','3')
 
 
-#pos=nx.spring_layout(G, iterations=50)
-
-fig, ax = plt.subplots()
-
 class QuiverPlot:
 
     Q = None
     
-    plt = None
+    fig = None
     ax = None
 
     pos = None
@@ -47,9 +39,12 @@ class QuiverPlot:
     xlim = (-2,2)
     ylim = (-2,2)
 
-    def __init__(self, quiver = None):
+    def __init__(self, quiver = None, fig = None , ax =  None):
+        self.fig = fig
+        self.ax = ax
         self.Q = quiver
         self.refresh_layout()
+        self.connect_events()
         pass
 
     def get_node_at_pos(self, point):
@@ -76,8 +71,7 @@ class QuiverPlot:
         self.plot_quiver_vertices()
         self.plot_quiver_arrows()
         plt.draw()
-
-
+        
     def plot_quiver_vertices(self):
         for v in self.Q.nodes():
             self._plot_point(self.pos[v])
@@ -119,75 +113,54 @@ class QuiverPlot:
                 markersize = self.node_size,
         )
 
+    def connect_events(self):
+        self.fig.canvas.mpl_connect('button_release_event', self.on_release)
+        self.fig.canvas.mpl_connect('pick_event', self.on_pick)
+        self.fig.canvas.mpl_connect('button_press_event', self.on_click_add_point)
+        self.fig.canvas.mpl_connect('button_press_event', self.on_click)
+        self.fig.canvas.mpl_connect('motion_notify_event', self.on_motion)
 
-
-
-##------------------------- Events
-
-is_dragging = False
-dragging_artist_name = None
-
-qp = QuiverPlot(G)
-qp.ax = ax
-qp.plt = plt
-
-
-def on_click_add_point(event):
-    if event and event.dblclick :
-        #TODO Check if there is another of this name
-        node_name = str(qp.Q.number_of_nodes()+1)
-        qp.Q.add_node(node_name)
-        print(type(event.xdata))
-        qp.set_node_pos(node_name, [event.xdata, event.ydata])
-        qp.redraw_quiver()
-
-
-
-def on_pick(event):
-    print("PICK")
-    global dragging_artist_name
-    artist_point = np.array(list(zip(*event.artist.get_data()))[0])
-    dragging_artist_name = qp.get_node_at_pos(artist_point)
-
-def on_click(event):
-    print("DRAG")
-    global is_dragging
-    is_dragging = True
-
-def on_release(event):
-    print("RELEASE")
-    global is_dragging, dragging_artist_name
     is_dragging = False
     dragging_artist_name = None
 
-def on_motion(event):
-    global is_dragging, dragging_artist_name, ax, pos
+    def on_click_add_point(self,event):
+        if event and event.dblclick :
+            #TODO Check if there is another of this name
+            node_name = str(self.Q.number_of_nodes()+1)
+            self.Q.add_node(node_name)
+            print(type(event.xdata))
+            self.set_node_pos(node_name, [event.xdata, event.ydata])
+            self.redraw_quiver()
 
-    if not is_dragging or dragging_artist_name == None:
-        return
-    print("HERE")
+    def on_pick(self, event):
+        print("PICK")
+        artist_point = np.array(list(zip(*event.artist.get_data()))[0])
+        self.dragging_artist_name = self.get_node_at_pos(artist_point)
 
-    qp.set_node_pos(dragging_artist_name,[event.xdata, event.ydata])
-    qp.redraw_quiver()
+    def on_click(self, event):
+        print("DRAG")
+        self.is_dragging = True
+
+    def on_release(self, event):
+        print("RELEASE")
+        self.is_dragging = False
+        self.dragging_artist_name = None
+
+    def on_motion(self, event):
+        if not self.is_dragging or self.dragging_artist_name == None:
+            return
+        print("HERE")
+        self.set_node_pos(self.dragging_artist_name,[event.xdata, event.ydata])
+        self.redraw_quiver()
 
 
-fig.canvas.mpl_connect('button_release_event', on_release)
-fig.canvas.mpl_connect('pick_event', on_pick)
-fig.canvas.mpl_connect('button_press_event', on_click_add_point)
-fig.canvas.mpl_connect('button_press_event', on_click)
-fig.canvas.mpl_connect('motion_notify_event', on_motion)
+##-----------------------------------------------------------------------------------------------------
 
 
+fig, ax = plt.subplots()
+qp = QuiverPlot(G, fig, ax)
 
-
-# ax.set_xlim(-1500,1500)
-# ax.set_ylim(-1500, 1500)
 ax.set_aspect('equal')
-#plt.axis('off')
-# plt.grid(False)
-# plt.show()
-
-
 qp.redraw_quiver()
 plt.show()
 
