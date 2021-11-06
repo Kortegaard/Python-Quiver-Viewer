@@ -31,12 +31,6 @@ G.add_edge('4','3')
 
 fig, ax = plt.subplots()
 
-
-pick_radius = 4
-node_size = 8
-arrow_shrink = 7
-
-
 class QuiverPlot:
 
     Q = None
@@ -109,8 +103,8 @@ class QuiverPlot:
                 for _ in range(num_u_v):
                     arr = patches.FancyArrowPatch(self.pos[u], self.pos[v],
                         arrowstyle='simple , tail_width=0.5, head_width=4, head_length=8',
-                        shrinkA = arrow_shrink,
-                        shrinkB = arrow_shrink,
+                        shrinkA = self.arrow_shrink,
+                        shrinkB = self.arrow_shrink,
                         color="k",
                         connectionstyle="arc3,rad="+str(rad)+"",
                     )
