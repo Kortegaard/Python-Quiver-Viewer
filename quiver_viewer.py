@@ -3,7 +3,9 @@ import matplotlib.patches as patches
 import matplotlib.pyplot as plt
 
 import networkx as nx
-from math import sqrt, floor
+from math import sqrt, floor, comb, sin, cos
+
+import re, json
 
 try:
     from networkx import graphviz_layout
@@ -23,6 +25,52 @@ G.add_edge('3','4')
 G.add_edge('4','3')
 
 
+#### ---------------- HELPER FUNCTIONS
+
+def bernstein_poly(i, n, t):
+    return comb(n, i) * ( t**(n-i) ) * (1 - t)**i
+
+
+def bezier_curve(points, nTimes=1000, start_t = 0.0, end_t = 1.0):
+
+    nPoints = len(points)
+    xPoints = np.array([p[0] for p in points])
+    yPoints = np.array([p[1] for p in points])
+
+    t = np.linspace(start_t, end_t, nTimes)
+
+    polynomial_array = np.array([ bernstein_poly(i, nPoints-1, t) for i in range(0, nPoints)   ])
+
+    xvals = np.dot(xPoints, polynomial_array)
+    yvals = np.dot(yPoints, polynomial_array)
+
+    return xvals, yvals
+
+def plot_self_bezier_curve(point, direction, angle, weight,  start_t = 0.0, end_t = 1.0, ax=None, color='k', pickradius = 1, picker = True):
+    theta = np.deg2rad(angle)
+    rot = np.array([[cos(theta), -sin(theta)], [sin(theta), cos(theta)]])
+    backrot = np.array([[cos(theta), sin(theta)], [-sin(theta), cos(theta)]])
+
+    unit_direction = direction / sqrt((direction**2).sum())
+    d1 = np.dot(rot, unit_direction)
+    d2 = np.dot(backrot, unit_direction)
+    
+    curve = bezier_curve(np.array([point,point + d1 * weight, point + d2 * weight ,point]), start_t = start_t, end_t = end_t)
+
+    # Arrow for the head
+    arr = patches.FancyArrowPatch(np.array([curve[0][-2], curve[1][-2]]), np.array([curve[0][-1], curve[1][-1]]),
+        arrowstyle='simple, tail_width=0.5, head_width=4, head_length=8',
+        capstyle='round',
+        color=color,
+    )
+    ax.add_patch(arr)
+    curve_patch = ax.plot(curve[0][0:-1], curve[1][0:-1], color, pickradius = pickradius, picker = picker)
+    return curve_patch[0]
+
+
+
+#### -------------QUIVERPLPOT
+
 class QuiverPlot:
 
     Q = None
@@ -38,6 +86,10 @@ class QuiverPlot:
 
     xlim = (-2,2)
     ylim = (-2,2)
+
+
+    edge_patches = []
+    node_patches = []
 
     def __init__(self, quiver = None, fig = None , ax =  None):
         self.fig = fig
@@ -65,6 +117,9 @@ class QuiverPlot:
         self.refresh_layout()
 
     def redraw_quiver(self):
+        print(ax.get_xlim())
+        self.xlim = ax.get_xlim()
+        self.ylim = ax.get_ylim()
         ax.cla()
         ax.set_xlim(*self.xlim)
         ax.set_ylim(*self.ylim)
@@ -74,29 +129,50 @@ class QuiverPlot:
         
     def plot_quiver_vertices(self):
         for v in self.Q.nodes():
-            self._plot_point(self.pos[v])
+            pl = self._plot_point(self.pos[v])
+            self.node_patches.append((pl, v))
 
     def plot_quiver_arrows(self):
         for u in self.Q.nodes():
             for v in self.Q.adj.get(u):
-                num_u_v = len(self.Q.adj.get(u).get(v)) if self.Q.adj.get(u).get(v) else 0
-                num_v_u = len(self.Q.adj.get(v).get(u)) if self.Q.adj.get(v).get(u) else 0
+                u_to_v = self.Q.adj.get(u).get(v) or dict()
+                v_to_u = self.Q.adj.get(v).get(u) or dict()
+
+                num_u_v = len(u_to_v)
+                num_v_u = len(v_to_u)
+
                 total_between = num_u_v + num_v_u
+
+                if u == v:
+                    for index in u_to_v:
+                        arr_info = u_to_v[index]
+
+                        arr_direction = arr_info.get('direction', np.array([1,1]))
+                        arr_info['direction'] = arr_direction
+
+                        arr_magnitude = arr_info.get('magnitude', 1)
+                        arr_info['magnitude'] = arr_magnitude
+
+                        arr_angle = arr_info.get('angle', 40)
+                        arr_info['angle'] = arr_angle
+
+                        arr_info['point'] = u
+
+                        arr = plot_self_bezier_curve(self.pos[u], arr_direction, arr_angle, arr_magnitude, 0.05, 0.95, ax=self.ax, pickradius=self.pick_radius, picker=True)
+                        self.edge_patches.append((arr,arr_info))
 
                 step = 0.35
                 rad = total_between // 2 * step
+                if u == v:
+                    rad = 1
                 
-                d = self.pos[v] - self.pos[u] #direction
-                ud = d/sqrt((d**2).sum()) # unit direction
-
                 shrink = 0.1
-                self.pos_u = self.pos[u] + ud * shrink
-                d = d - 2*ud * shrink
                 
 
                 for _ in range(num_u_v):
                     arr = patches.FancyArrowPatch(self.pos[u], self.pos[v],
-                        arrowstyle='simple , tail_width=0.5, head_width=4, head_length=8',
+                        arrowstyle='simple, tail_width=0.5, head_width=4, head_length=8',
+                        capstyle='round',
                         shrinkA = self.arrow_shrink,
                         shrinkB = self.arrow_shrink,
                         color="k",
@@ -112,6 +188,7 @@ class QuiverPlot:
                 pickradius = self.pick_radius,
                 markersize = self.node_size,
         )
+        return pl[0]
 
     def connect_events(self):
         self.fig.canvas.mpl_connect('button_release_event', self.on_release)
@@ -121,8 +198,11 @@ class QuiverPlot:
         self.fig.canvas.mpl_connect('motion_notify_event', self.on_motion)
 
     is_dragging = False
+    is_dragging_edge = False
+    is_dragging_node= False
     dragging_artist_name = None
-
+    draggin_info = None
+    
     def on_click_add_point(self,event):
         if event and event.dblclick :
             #TODO Check if there is another of this name
@@ -134,8 +214,19 @@ class QuiverPlot:
 
     def on_pick(self, event):
         print("PICK")
-        artist_point = np.array(list(zip(*event.artist.get_data()))[0])
-        self.dragging_artist_name = self.get_node_at_pos(artist_point)
+        print(event.artist)
+        for i, patch in enumerate(self.node_patches):
+            if event.artist == patch[0]:
+                self.is_dragging_node = True
+                self.draggin_info = patch[1]
+                break
+        for i, patch in enumerate(self.edge_patches):
+            if event.artist == patch[0]:
+                self.is_dragging_edge = True
+                self.draggin_info = patch[1]
+                break
+        #artist_point = np.array(list(zip(*event.artist.get_data()))[0])
+        #self.dragging_artist_name = self.get_node_at_pos(artist_point)
 
     def on_click(self, event):
         print("DRAG")
@@ -143,24 +234,43 @@ class QuiverPlot:
 
     def on_release(self, event):
         print("RELEASE")
+        self.is_dragging_edge = False
+        self.is_dragging_node = False
         self.is_dragging = False
         self.dragging_artist_name = None
+        draggin_info = None
 
     def on_motion(self, event):
-        if not self.is_dragging or self.dragging_artist_name == None:
+        if not self.is_dragging or self.draggin_info == None:
             return
-        print("HERE")
-        self.set_node_pos(self.dragging_artist_name,[event.xdata, event.ydata])
+        if self.is_dragging_node:
+            self.set_node_pos(self.draggin_info,[event.xdata, event.ydata])
+        if self.is_dragging_edge:
+            mouse_point = np.array([event.xdata, event.ydata])
+            direction = mouse_point - self.pos[self.draggin_info['point']]
+
+            self.draggin_info['direction'] = direction
+            self.draggin_info['magnitude'] = sqrt((direction**2).sum()) * 1.7
+            print(direction)
         self.redraw_quiver()
 
+
+def load_gap_quiver(string):
+    pure_gap_string = "[" + re.findall(r'Quiver\(\s+(.*)\s+\)', string)[0] + "]"
+    gap_quiver_arr = json.loads(pure_gap_string)
+    G = nx.MultiDiGraph()
+    G.add_nodes_from(gap_quiver_arr[0])
+    G.add_edges_from(list(map(tuple, gap_quiver_arr[1])))
+    return G
 
 ##-----------------------------------------------------------------------------------------------------
 
 
 fig, ax = plt.subplots()
-qp = QuiverPlot(G, fig, ax)
-
+k = 'Quiver( ["u","v"], [["u","u","a"],["u","v","b"],["v","u","c"],["v","v","d"]] )'
+qp = QuiverPlot(load_gap_quiver(k), fig, ax)
 ax.set_aspect('equal')
 qp.redraw_quiver()
 plt.show()
+print(qp.Q.adj)
 
