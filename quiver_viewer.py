@@ -1,9 +1,12 @@
 import numpy as np
+import pyperclip
 import matplotlib.patches as patches
 import matplotlib.pyplot as plt
 
 import networkx as nx
 from math import sqrt, floor, comb, sin, cos
+
+from matplotlib.widgets import TextBox
 
 import re, json
 
@@ -84,8 +87,8 @@ class QuiverPlot:
     node_size = 8
     arrow_shrink = 7
 
-    xlim = (-2,2)
-    ylim = (-2,2)
+    xlim = (-4,4)
+    ylim = (-2.5,2.5)
 
 
     edge_patches = []
@@ -99,6 +102,16 @@ class QuiverPlot:
         self.connect_events()
         pass
 
+    def set_quiver(self, Q):
+        self.ax.cla()
+        self.edge_patches = []
+        self.node_patches = []
+        self.pos = None
+        self.Q = Q
+        self.refresh_layout()
+        self.redraw_quiver()
+        #pls.draw()
+
     def get_node_at_pos(self, point):
         for p in self.pos:
             if np.array_equal(self.pos[p], point):
@@ -110,19 +123,19 @@ class QuiverPlot:
 
     def refresh_layout(self):
         if self.Q != None:
-            self.pos=nx.spring_layout(self.Q, iterations=50)
+            self.pos=nx.spring_layout(self.Q, iterations=100)
 
     def set_quiver(self, Q):
         self.Q = Q
         self.refresh_layout()
+        self.redraw_quiver()
 
     def redraw_quiver(self):
-        print(ax.get_xlim())
-        self.xlim = ax.get_xlim()
-        self.ylim = ax.get_ylim()
-        ax.cla()
-        ax.set_xlim(*self.xlim)
-        ax.set_ylim(*self.ylim)
+        # self.xlim = ax.get_xlim()
+        # self.ylim = ax.get_ylim()
+        self.ax.cla()
+        self.ax.set_xlim(*self.xlim)
+        self.ax.set_ylim(*self.ylim)
         self.plot_quiver_vertices()
         self.plot_quiver_arrows()
         plt.draw()
@@ -178,7 +191,7 @@ class QuiverPlot:
                         color="k",
                         connectionstyle="arc3,rad="+str(rad)+"",
                     )
-                    ax.add_patch(arr)
+                    self.ax.add_patch(arr)
                     rad -= step
 
     def _plot_point(self, point):
@@ -251,8 +264,9 @@ class QuiverPlot:
 
             self.draggin_info['direction'] = direction
             self.draggin_info['magnitude'] = sqrt((direction**2).sum()) * 1.7
-            print(direction)
         self.redraw_quiver()
+
+
 
 
 def load_gap_quiver(string):
@@ -266,11 +280,48 @@ def load_gap_quiver(string):
 ##-----------------------------------------------------------------------------------------------------
 
 
+
 fig, ax = plt.subplots()
+plt.subplots_adjust(top=1, bottom=0, left=0, right=1)
+# plt.subplots_adjust(bottom=0.2)
+ax.axes.get_xaxis().set_visible(False)
+ax.axes.get_yaxis().set_visible(False)
+
 k = 'Quiver( ["u","v"], [["u","u","a"],["u","v","b"],["v","u","c"],["v","v","d"]] )'
+ax.set_autoscaley_on(True)
 qp = QuiverPlot(load_gap_quiver(k), fig, ax)
+
+
+def on_key(event):
+
+    print(event.key)
+    global qp
+    if event.key in ["ctrl+V", "cmd+V", "ctrl+v", "cmd+v"]:
+        print("SET QUIVER")
+        try:
+            q = load_gap_quiver(pyperclip.paste())
+            qp.set_quiver(q)
+
+        except:
+            print("Err")
+fig.canvas.mpl_connect('key_press_event', on_key)
+
+
+# def submit(text):
+#     global qp
+#     try:
+#         q = load_gap_quiver(text)
+#         qp.set_quiver(q)
+#     except:
+#         print("Err")
+
+# axbox = plt.axes([0.1, 0.05, 0.8, 0.075])
+# l = 'Quiver( ["u","v"], [["u","u","a"],["u","v","b"],["v","u","d"]] )'
+# text_box = TextBox(axbox, 'Evaluate', initial=l)
+# text_box.on_submit(submit)
+
+plt.draw()
 ax.set_aspect('equal')
 qp.redraw_quiver()
 plt.show()
-print(qp.Q.adj)
 
