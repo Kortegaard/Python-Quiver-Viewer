@@ -256,8 +256,6 @@ class QuiverPlot:
         self.redraw_quiver()
 
 
-
-
 def load_gap_quiver(string):
     pure_gap_string = "[" + re.findall(r'Quiver\(\s+(.*)\s+\)', string)[0] + "]"
     gap_quiver_arr = json.loads(pure_gap_string)
@@ -272,7 +270,6 @@ def load_gap_quiver(string):
 
 fig, ax = plt.subplots()
 plt.subplots_adjust(top=1, bottom=0, left=0, right=1)
-# plt.subplots_adjust(bottom=0.2)
 ax.axes.get_xaxis().set_visible(False)
 ax.axes.get_yaxis().set_visible(False)
 
@@ -280,8 +277,7 @@ k = 'Quiver( ["u","v"], [["u","u","a"],["u","v","b"],["v","u","c"],["v","v","d"]
 ax.set_autoscaley_on(True)
 qp = QuiverPlot(load_gap_quiver(k), fig, ax)
 
-
-def on_key(event):
+def on_key_press(event):
     global qp
     if event.key in ["ctrl+V", "cmd+V", "ctrl+v", "cmd+v"]:
         try:
@@ -290,21 +286,8 @@ def on_key(event):
 
         except:
             print("Err")
-fig.canvas.mpl_connect('key_press_event', on_key)
 
-
-# def submit(text):
-#     global qp
-#     try:
-#         q = load_gap_quiver(text)
-#         qp.set_quiver(q)
-#     except:
-#         print("Err")
-
-# axbox = plt.axes([0.1, 0.05, 0.8, 0.075])
-# l = 'Quiver( ["u","v"], [["u","u","a"],["u","v","b"],["v","u","d"]] )'
-# text_box = TextBox(axbox, 'Evaluate', initial=l)
-# text_box.on_submit(submit)
+fig.canvas.mpl_connect('key_press_event', on_key_press)
 
 plt.draw()
 ax.set_aspect('equal')
