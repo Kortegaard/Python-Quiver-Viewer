@@ -14,18 +14,8 @@ try:
     from networkx import graphviz_layout
     layout=nx.graphviz_layout
 except ImportError:
-    print("PyGraphviz not found; drawing with spring layout; will be slow.")
+    #print("PyGraphviz not found; drawing with spring layout; will be slow.")
     layout=nx.spring_layout
-
-
-G = nx.MultiDiGraph()
-G.add_edge('1','2')
-G.add_edge('1','2')
-G.add_edge('1','2')
-G.add_edge('1','3')
-G.add_edge('3','2')
-G.add_edge('3','4')
-G.add_edge('4','3')
 
 
 #### ---------------- HELPER FUNCTIONS
@@ -100,6 +90,8 @@ class QuiverPlot:
         self.Q = quiver
         self.refresh_layout()
         self.connect_events()
+        self.ax.set_xlim(self.xlim)
+        self.ax.set_ylim(self.ylim)
         pass
 
     def set_quiver(self, Q):
@@ -110,7 +102,6 @@ class QuiverPlot:
         self.Q = Q
         self.refresh_layout()
         self.redraw_quiver()
-        #pls.draw()
 
     def get_node_at_pos(self, point):
         for p in self.pos:
@@ -131,8 +122,8 @@ class QuiverPlot:
         self.redraw_quiver()
 
     def redraw_quiver(self):
-        # self.xlim = ax.get_xlim()
-        # self.ylim = ax.get_ylim()
+        self.xlim = ax.get_xlim()
+        self.ylim = ax.get_ylim()
         self.ax.cla()
         self.ax.set_xlim(*self.xlim)
         self.ax.set_ylim(*self.ylim)
@@ -221,13 +212,11 @@ class QuiverPlot:
             #TODO Check if there is another of this name
             node_name = str(self.Q.number_of_nodes()+1)
             self.Q.add_node(node_name)
-            print(type(event.xdata))
             self.set_node_pos(node_name, [event.xdata, event.ydata])
             self.redraw_quiver()
 
     def on_pick(self, event):
-        print("PICK")
-        print(event.artist)
+        #print("PICK")
         for i, patch in enumerate(self.node_patches):
             if event.artist == patch[0]:
                 self.is_dragging_node = True
@@ -242,11 +231,11 @@ class QuiverPlot:
         #self.dragging_artist_name = self.get_node_at_pos(artist_point)
 
     def on_click(self, event):
-        print("DRAG")
+        #print("DRAG")
         self.is_dragging = True
 
     def on_release(self, event):
-        print("RELEASE")
+        #print("RELEASE")
         self.is_dragging_edge = False
         self.is_dragging_node = False
         self.is_dragging = False
@@ -293,11 +282,8 @@ qp = QuiverPlot(load_gap_quiver(k), fig, ax)
 
 
 def on_key(event):
-
-    print(event.key)
     global qp
     if event.key in ["ctrl+V", "cmd+V", "ctrl+v", "cmd+v"]:
-        print("SET QUIVER")
         try:
             q = load_gap_quiver(pyperclip.paste())
             qp.set_quiver(q)
